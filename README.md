@@ -38,11 +38,11 @@ Try it safely with `sh skills/power-off/scripts/power-off.sh --dry-run`.
 ### Any agent: the `skills` CLI
 
 ```bash
-npx skills add illescasDaniel/power-off
+npx skills add illescasDaniel/power-off-skill
 ```
 
 It asks which agents to install for and whether to install into the current project or globally. Non-interactive:
-`npx skills add illescasDaniel/power-off -a claude-code -y`, plus `-g` for global.
+`npx skills add illescasDaniel/power-off-skill -a claude-code -y`, plus `-g` for global.
 
 ### By hand
 
