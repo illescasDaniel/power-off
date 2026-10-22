@@ -1,9 +1,16 @@
 #!/bin/sh
-# Power off this machine. Linux, macOS, WSL (powers off the Windows host), Git Bash/MSYS/Cygwin.
-# Usage: power-off.sh [--dry-run]   (--dry-run only prints the command)
-# Waits 5s before powering off so the calling agent can finish its reply; Ctrl+C or killing it cancels.
+# Power off (or suspend) this machine. Linux, macOS, WSL (acts on the Windows host), Git Bash/MSYS/Cygwin.
+# Usage: power-off.sh [--sleep] [--dry-run]   (--sleep suspends instead of powering off; --dry-run only prints the command)
+# Waits 5s first so the calling agent can finish its reply; Ctrl+C or killing it cancels.
 set -u
-dry=0; [ "${1-}" = "--dry-run" ] && dry=1
+dry=0; mode=off
+for a in "$@"; do
+  case "$a" in
+    --dry-run) dry=1 ;;
+    --sleep) mode=sleep ;;
+    *) echo "power-off: unknown option: $a" >&2; exit 2 ;;
+  esac
+done
 
 case "$(uname -s)" in
   Darwin) os=macos ;;
@@ -13,19 +20,27 @@ case "$(uname -s)" in
   *) echo "power-off: unsupported OS: $(uname -s)" >&2; exit 2 ;;
 esac
 
-case "$os" in
-  linux)
+case "$os/$mode" in
+  linux/off)
     if command -v systemctl >/dev/null 2>&1; then set -- systemctl poweroff
     else set -- poweroff; fi ;;
-  macos)   set -- osascript -e 'tell app "System Events" to shut down' ;;
-  wsl)
+  linux/sleep) set -- systemctl suspend ;;
+  macos/off)   set -- osascript -e 'tell app "System Events" to shut down' ;;
+  macos/sleep) set -- pmset sleepnow ;;
+  wsl/*|windows/*)
+    # WSL and Git Bash call the Windows executables; doubled slashes stop MSYS rewriting them into paths.
     exe=shutdown.exe
-    command -v "$exe" >/dev/null 2>&1 || exe=/mnt/c/Windows/System32/shutdown.exe
-    set -- "$exe" /s /t 0 ;;
-  windows) set -- shutdown.exe //s //t 0 ;;  # doubled slashes stop MSYS rewriting them into paths
+    if [ "$os" = wsl ]; then
+      command -v "$exe" >/dev/null 2>&1 || exe=/mnt/c/Windows/System32/shutdown.exe
+      flags="/s /t 0"
+    else
+      flags="//s //t 0"
+    fi
+    if [ "$mode" = sleep ]; then set -- rundll32.exe powrprof.dll,SetSuspendState 0,1,0
+    else set -- "$exe" $flags; fi ;;
 esac
 
-echo "power-off: detected $os; command: $*"
+echo "power-off: detected $os ($mode); command: $*"
 [ "$dry" = 1 ] && exit 0
 sleep 5
 exec "$@"

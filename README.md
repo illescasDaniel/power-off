@@ -9,18 +9,27 @@ Cursor and any other agent that loads skills.
 ## How it works
 
 1. **Trigger check**: only your own message in the conversation counts as a request.
-2. **Finish first**: the work is completed (a failed task is retried once, then it powers off anyway) and the report
-   written to a file, since the session dies at shutdown.
-3. **Safety check**: it asks first on remote machines (SSH), when other users are logged in, and on WSL (where the
-   command powers off the Windows host).
-4. **Shutdown**: `scripts/power-off.sh` (or `power-off.ps1`) detects the OS, waits 5 seconds (so the agent can finish its reply) and runs the graceful command. No force flags.
+2. **Pick the mode** from your words: *normal*, or *force* if you add "even if it fails or needs my attention"
+   (or run `/power-off force`).
+3. **Finish first**: a failed task is retried once. Then:
 
-| OS | Command |
-|---|---|
-| Linux | `systemctl poweroff` |
-| macOS | `osascript -e 'tell app "System Events" to shut down'` |
-| Windows | `shutdown /s /t 0` |
-| WSL | `shutdown.exe /s /t 0` |
+   | Situation | Normal | Force |
+   |---|---|---|
+   | Done, or failed twice | power off | power off |
+   | Needs your decision | **sleep**, so it resumes when you are back | power off |
+
+   The report is written to a file first, since the session dies at shutdown.
+4. **Safety check**: it asks first on remote machines (SSH), when other users are logged in, and on WSL (where the
+   command powers off the Windows host), in both modes.
+5. **Shutdown**: `scripts/power-off.sh [--sleep]` (or `power-off.ps1 [-Sleep]`) detects the OS, waits 5 seconds (so
+   the agent can finish its reply) and runs the graceful command. No OS force flags.
+
+| OS | Power off | Sleep |
+|---|---|---|
+| Linux | `systemctl poweroff` | `systemctl suspend` |
+| macOS | `osascript -e 'tell app "System Events" to shut down'` | `pmset sleepnow` |
+| Windows | `shutdown /s /t 0` | `rundll32.exe powrprof.dll,SetSuspendState 0,1,0` |
+| WSL | `shutdown.exe /s /t 0` | same `rundll32.exe` call |
 
 Try it safely with `sh skills/power-off/scripts/power-off.sh --dry-run`.
 
